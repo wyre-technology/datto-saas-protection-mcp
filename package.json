@@ -1,0 +1,68 @@
+{
+  "name": "@wyre-technology/datto-saas-protection-mcp",
+  "version": "0.0.0",
+  "description": "Datto SaaS Protection MCP server for Claude — M365/GWS backup status, restores, seat management",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "datto-saas-protection-mcp": "./dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "node dist/index.js",
+    "lint": "eslint src --ext .ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "pack:mcpb": "node scripts/pack-mcpb.js",
+    "validate:mcpb": "mcpb validate manifest.json"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wyre-technology/datto-saas-protection-mcp.git"
+  },
+  "keywords": [
+    "mcp",
+    "claude",
+    "datto",
+    "saas-backup",
+    "backupify",
+    "m365",
+    "google-workspace",
+    "kaseya",
+    "msp"
+  ],
+  "author": "Wyre Technology",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/wyre-technology/datto-saas-protection-mcp/issues"
+  },
+  "homepage": "https://github.com/wyre-technology/datto-saas-protection-mcp#readme",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.25.3",
+    "@wyre-technology/node-datto-saas-protection": "^1.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "eslint": "^8.56.0",
+    "@typescript-eslint/eslint-plugin": "^6.19.0",
+    "@typescript-eslint/parser": "^6.19.0",
+    "typescript": "^5.3.3",
+    "vitest": "^1.2.0",
+    "semantic-release": "^25.0.0",
+    "@semantic-release/changelog": "^6.0.3",
+    "@semantic-release/git": "^10.0.1",
+    "@semantic-release/github": "^11.0.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "manifest_version": "0.3",
+  "name": "datto-saas-protection-mcp",
+  "display_name": "Datto SaaS Protection MCP Server",
+  "version": "0.0.0",
+  "description": "MCP server for Datto SaaS Protection (Backupify) - access M365/GWS backup status, queue restores, and review seat usage through AI assistants",
+  "long_description": "Provides AI assistants with structured access to your Datto SaaS Protection (Backupify) tenant. List customer organizations and protected domains, browse seats and backup history for Microsoft 365 and Google Workspace, queue restores, monitor restore progress, and review activity logs and license usage through the Model Context Protocol.",
+  "author": { "name": "Wyre Technology", "url": "https://github.com/wyre-technology" },
+  "repository": { "type": "git", "url": "https://github.com/wyre-technology/datto-saas-protection-mcp" },
+  "homepage": "https://github.com/wyre-technology/datto-saas-protection-mcp",
+  "license": "Apache-2.0",
+  "keywords": ["datto", "saas-protection", "backupify", "m365", "google-workspace", "msp", "kaseya"],
+  "server": {
+    "type": "node",
+    "entry_point": "dist/index.js",
+    "mcp_config": {
+      "command": "node",
+      "args": ["${__dirname}/dist/index.js"],
+      "env": {
+        "DATTO_SAAS_API_KEY": "${user_config.datto_saas_api_key}",
+        "DATTO_SAAS_REGION": "${user_config.datto_saas_region}",
+        "MCP_TRANSPORT": "stdio"
+      }
+    }
+  },
+  "tools_generated": true,
+  "user_config": {
+    "datto_saas_api_key": { "type": "string", "title": "Datto SaaS API Key", "description": "Your Datto SaaS Protection (Backupify) API key", "sensitive": true, "required": true },
+    "datto_saas_region": { "type": "string", "title": "Datto SaaS Region", "description": "Region: 'us' (default) or 'eu'", "sensitive": false, "required": false }
+  },
+  "compatibility": { "platforms": ["darwin", "win32", "linux"], "runtimes": { "node": ">=18.0.0" }, "claude_desktop": ">=0.10.0" }
+}

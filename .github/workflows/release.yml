@@ -1,0 +1,231 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x, 22.x]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+      - name: Configure npm for GitHub Packages
+        run: |
+          echo "@wyre-technology:registry=https://npm.pkg.github.com" >> .npmrc
+          echo "//npm.pkg.github.com/:_authToken=${{ secrets.GITHUB_TOKEN }}" >> .npmrc
+      - run: npm ci
+      - run: npm run lint
+        continue-on-error: true
+      - run: npm run build
+      - run: npm test
+
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: write
+      issues: write
+    outputs:
+      version: ${{ steps.release-version.outputs.version }}
+      released: ${{ steps.release-version.outputs.released }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - name: Configure npm for GitHub Packages
+        run: |
+          echo "@wyre-technology:registry=https://npm.pkg.github.com" >> .npmrc
+          echo "//npm.pkg.github.com/:_authToken=${{ secrets.GITHUB_TOKEN }}" >> .npmrc
+      - run: npm ci
+      - run: npm run build
+      - name: Semantic Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx semantic-release
+      - name: Get released version
+        id: release-version
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          if gh release view "v$VERSION" --repo ${{ github.repository }} &>/dev/null; then
+            echo "released=true" >> $GITHUB_OUTPUT
+          else
+            echo "released=false" >> $GITHUB_OUTPUT
+          fi
+
+  docker:
+    name: Docker
+    runs-on: ubuntu-latest
+    needs: [release]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha
+            type=raw,value=latest,enable={{is_default_branch}}
+      - name: Resolve release version
+        id: version
+        env:
+          RELEASE_VERSION: ${{ needs.release.outputs.version }}
+        run: |
+          if [ -z "$RELEASE_VERSION" ]; then
+            echo "ERROR: needs.release.outputs.version is empty" >&2
+            exit 1
+          fi
+          echo "version=$RELEASE_VERSION" >> "$GITHUB_OUTPUT"
+      - name: Prepare npmrc for build secret
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          {
+            echo "@wyre-technology:registry=https://npm.pkg.github.com"
+            echo "//npm.pkg.github.com/:_authToken=$GH_TOKEN"
+          } > /tmp/.npmrc
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}:latest
+            ghcr.io/${{ github.repository }}:v${{ steps.version.outputs.version }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          secret-files: |
+            npmrc=/tmp/.npmrc
+      - name: Get released version
+        id: release-version
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          if gh release view "v$VERSION" --repo ${{ github.repository }} &>/dev/null; then
+            echo "released=true" >> $GITHUB_OUTPUT
+          else
+            echo "released=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Pack and upload MCPB bundle
+        if: steps.release-version.outputs.released == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          BUNDLE_NAME=$(node -p "require('./package.json').name.replace(/^@.*\\//, '')")
+          npm install -g @anthropic-ai/mcpb
+          npm run pack:mcpb
+          gh release upload "v${{ steps.release-version.outputs.version }}" "${BUNDLE_NAME}.mcpb" \
+            --repo ${{ github.repository }} --clobber
+      - name: Discord release notification
+        if: false  # disabled - too noisy, re-enable later
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+        run: |
+          VERSION="${{ steps.release-version.outputs.version }}"
+          BODY=$(gh release view "v$VERSION" --json body --jq '.body' 2>/dev/null || echo "")
+          SUMMARY=$(echo "$BODY" | sed '1,2d' | head -30 | cut -c1-1800)
+          DESC="**${{ github.repository }}** — [v${VERSION}](https://github.com/${{ github.repository }}/releases/tag/v${VERSION})"$'\n'"${SUMMARY}"
+          PAYLOAD=$(jq -n --arg title "New Release: v${VERSION}" --arg desc "$DESC" '{embeds: [{title: $title, description: $desc, color: 5763847}]}')
+          curl -sf -H "Content-Type: application/json" -d "$PAYLOAD" "$DISCORD_WEBHOOK"
+  deploy:
+    name: Deploy to Azure Container Apps
+    runs-on: ubuntu-latest
+    needs: [docker]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    environment: production
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy to Azure Container Apps
+        run: |
+          SHORT_SHA="${GITHUB_SHA::7}"
+          IMAGE="ghcr.io/${{ github.repository }}:latest"
+          echo "Deploying $IMAGE to gwp-datto-saas-protection (revision tag sha-${SHORT_SHA}-${GITHUB_RUN_ID})"
+          az containerapp update \
+            --name gwp-datto-saas-protection \
+            --resource-group mcp-gateway-prod \
+            --image "$IMAGE" \
+            --set-env-vars "IMAGE_VERSION=sha-${SHORT_SHA}-${GITHUB_RUN_ID}"
+
+  mcp-registry:
+    name: Publish to MCP Registry
+    runs-on: ubuntu-latest
+    needs: [release, docker]
+    if: needs.release.outputs.released == 'true'
+    permissions:
+      id-token: write
+      contents: read
+    env:
+      VERSION: ${{ needs.release.outputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install mcp-publisher
+        run: |
+          curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" \
+            | tar xz mcp-publisher
+      - name: Stamp version into server.json
+        run: |
+          jq --arg v "$VERSION" \
+            '.version = $v | .packages[0].identifier = "ghcr.io/wyre-technology/datto-saas-protection-mcp:v" + $v' \
+            server.json > server.json.tmp
+          mv server.json.tmp server.json
+          cat server.json
+      - name: Validate server.json
+        run: ./mcp-publisher validate
+      - name: Authenticate to MCP Registry (GitHub OIDC)
+        run: ./mcp-publisher login github-oidc
+      - name: Publish to MCP Registry
+        run: ./mcp-publisher publish
+      - name: Verify registry listing
+        run: |
+          sleep 5
+          curl -sf "https://registry.modelcontextprotocol.io/v0.1/servers?search=io.github.wyre-technology/datto-saas-protection-mcp" \
+            | jq '.servers[]?.server | {name, version}'

@@ -1,0 +1,16 @@
+# Smithery configuration file: https://smithery.ai/docs/config#smitheryyaml
+startCommand:
+  type: stdio
+  configSchema:
+    type: object
+    required:
+      - dattoSaasApiKey
+    properties:
+      dattoSaasApiKey:
+        type: string
+        description: Your Datto SaaS Protection (Backupify) API key
+      dattoSaasRegion:
+        type: string
+        description: "Region: 'us' (default) or 'eu'"
+  commandFunction: |-
+    (config) => ({ command: 'node', args: ['dist/index.js'], env: { DATTO_SAAS_API_KEY: config.dattoSaasApiKey, DATTO_SAAS_REGION: config.dattoSaasRegion, MCP_TRANSPORT: 'stdio' } })
