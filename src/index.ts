@@ -433,7 +433,7 @@ function createMcpServer(credentialOverrides?: DattoSaasCredentials): Server {
 
         case "datto_saas_get_license_usage": {
           const { clientId } = args as { clientId: string };
-          const license = await client.license.get(clientId);
+          const license = await client.license.getUsage(clientId);
           return { content: [{ type: "text", text: JSON.stringify(license ?? {}, null, 2) }] };
         }
 
