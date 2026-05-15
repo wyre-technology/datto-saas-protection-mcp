@@ -17,7 +17,8 @@
       "command": "node",
       "args": ["${__dirname}/dist/index.js"],
       "env": {
-        "DATTO_SAAS_API_KEY": "${user_config.datto_saas_api_key}",
+        "DATTO_SAAS_PUBLIC_KEY": "${user_config.datto_saas_public_key}",
+        "DATTO_SAAS_SECRET_KEY": "${user_config.datto_saas_secret_key}",
         "DATTO_SAAS_REGION": "${user_config.datto_saas_region}",
         "MCP_TRANSPORT": "stdio"
       }
@@ -25,7 +26,8 @@
   },
   "tools_generated": true,
   "user_config": {
-    "datto_saas_api_key": { "type": "string", "title": "Datto SaaS API Key", "description": "Your Datto SaaS Protection (Backupify) API key", "sensitive": true, "required": true },
+    "datto_saas_public_key": { "type": "string", "title": "Datto SaaS Public Key", "description": "Public API key from the Datto SaaS Protection partner portal", "sensitive": true, "required": true },
+    "datto_saas_secret_key": { "type": "string", "title": "Datto SaaS Secret Key", "description": "Secret API key from the Datto SaaS Protection partner portal", "sensitive": true, "required": true },
     "datto_saas_region": { "type": "string", "title": "Datto SaaS Region", "description": "Region: 'us' (default) or 'eu'", "sensitive": false, "required": false }
   },
   "compatibility": { "platforms": ["darwin", "win32", "linux"], "runtimes": { "node": ">=18.0.0" }, "claude_desktop": ">=0.10.0" }

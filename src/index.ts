@@ -27,22 +27,26 @@ import { elicitConfirmation, elicitSelection, elicitText } from "./utils/elicita
 // ---------------------------------------------------------------------------
 
 interface DattoSaasCredentials {
-  apiKey: string;
+  publicKey: string;
+  secretKey: string;
   region?: string;
 }
 
 function getCredentials(): DattoSaasCredentials | null {
-  const apiKey = process.env.DATTO_SAAS_API_KEY;
-  if (!apiKey) return null;
+  const publicKey = process.env.DATTO_SAAS_PUBLIC_KEY;
+  const secretKey = process.env.DATTO_SAAS_SECRET_KEY;
+  if (!publicKey || !secretKey) return null;
   return {
-    apiKey,
+    publicKey,
+    secretKey,
     region: process.env.DATTO_SAAS_REGION || "us",
   };
 }
 
 function createClient(creds: DattoSaasCredentials): DattoSaasProtectionClient {
   return new DattoSaasProtectionClient({
-    apiKey: creds.apiKey,
+    publicKey: creds.publicKey,
+    secretKey: creds.secretKey,
     region: (creds.region as "us" | "eu") || "us",
   });
 }
@@ -330,7 +334,7 @@ function createMcpServer(credentialOverrides?: DattoSaasCredentials): Server {
           {
             type: "text",
             text:
-              "Error: No API credentials provided. Please configure DATTO_SAAS_API_KEY (and optionally DATTO_SAAS_REGION) environment variables, or pass them as gateway headers.",
+              "Error: No API credentials provided. Please configure DATTO_SAAS_PUBLIC_KEY + DATTO_SAAS_SECRET_KEY (and optionally DATTO_SAAS_REGION) environment variables, or pass them as gateway headers.",
           },
         ],
         isError: true,
@@ -513,23 +517,24 @@ async function startHttpTransport(): Promise<void> {
       let gatewayCredentials: DattoSaasCredentials | undefined;
       if (isGatewayMode) {
         const headers = req.headers as Record<string, string | string[] | undefined>;
-        const apiKey = headers["x-datto-saas-api-key"] as string | undefined;
+        const publicKey = headers["x-datto-saas-public-key"] as string | undefined;
+        const secretKey = headers["x-datto-saas-secret-key"] as string | undefined;
         const region = (headers["x-datto-saas-region"] as string | undefined) || "us";
 
-        if (!apiKey) {
+        if (!publicKey || !secretKey) {
           res.writeHead(401, { "Content-Type": "application/json" });
           res.end(
             JSON.stringify({
               error: "Missing credentials",
               message:
-                "Gateway mode requires the X-Datto-SaaS-API-Key header (X-Datto-SaaS-Region optional, defaults to 'us')",
-              required: ["X-Datto-SaaS-API-Key"],
+                "Gateway mode requires X-Datto-SaaS-Public-Key and X-Datto-SaaS-Secret-Key headers (X-Datto-SaaS-Region optional, defaults to 'us')",
+              required: ["X-Datto-SaaS-Public-Key", "X-Datto-SaaS-Secret-Key"],
             })
           );
           return;
         }
 
-        gatewayCredentials = { apiKey, region };
+        gatewayCredentials = { publicKey, secretKey, region };
       }
 
       // Stateless: fresh server + transport per request

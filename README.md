@@ -33,7 +33,8 @@ license usage.
 ### Local (env mode)
 
 ```sh
-export DATTO_SAAS_API_KEY="..."
+export DATTO_SAAS_PUBLIC_KEY="..."
+export DATTO_SAAS_SECRET_KEY="..."
 export DATTO_SAAS_REGION="us"   # or "eu"
 ```
 
@@ -41,7 +42,8 @@ export DATTO_SAAS_REGION="us"   # or "eu"
 
 The WYRE MCP Gateway injects credentials per request via headers:
 
-- `X-Datto-SaaS-API-Key` (required, secret)
+- `X-Datto-SaaS-Public-Key` (required, secret)
+- `X-Datto-SaaS-Secret-Key` (required, secret)
 - `X-Datto-SaaS-Region` (optional, default `us`)
 
 ## Run
