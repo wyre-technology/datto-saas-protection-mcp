@@ -20,7 +20,7 @@ jobs:
     name: Release
     runs-on: ubuntu-latest
     needs: test
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: needs.release.outputs.released == 'true'
     permissions:
       contents: write
       issues: write
