@@ -25,7 +25,7 @@ jobs:
       contents: write
       issues: write
     outputs:
-      version: ${{ steps.release-version.outputs.version }}
+      version: ${{ needs.release.outputs.version }}
       released: ${{ steps.release-version.outputs.released }}
     steps:
       - uses: actions/checkout@v4
@@ -123,28 +123,15 @@ jobs:
           cache-to: type=gha,mode=max
           secret-files: |
             npmrc=/tmp/.npmrc
-      - name: Get released version
-        id: release-version
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          VERSION=$(node -p "require('./package.json').version")
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          if [ "$VERSION" != "$PRE_VERSION" ]; then
-            echo "released=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "released=false" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Pack and upload MCPB bundle
-        if: steps.release-version.outputs.released == 'true'
+        if: needs.release.outputs.released == 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           BUNDLE_NAME=$(node -p "require('./package.json').name.replace(/^@.*\\//, '')")
           npm install -g @anthropic-ai/mcpb
           npm run pack:mcpb
-          gh release upload "v${{ steps.release-version.outputs.version }}" "${BUNDLE_NAME}.mcpb" \
+          gh release upload "v${{ needs.release.outputs.version }}" "${BUNDLE_NAME}.mcpb" \
             --repo ${{ github.repository }} --clobber
       - name: Discord release notification
         if: false  # disabled - too noisy, re-enable later
@@ -152,7 +139,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
         run: |
-          VERSION="${{ steps.release-version.outputs.version }}"
+          VERSION="${{ needs.release.outputs.version }}"
           BODY=$(gh release view "v$VERSION" --json body --jq '.body' 2>/dev/null || echo "")
           SUMMARY=$(echo "$BODY" | sed '1,2d' | head -30 | cut -c1-1800)
           DESC="**${{ github.repository }}** — [v${VERSION}](https://github.com/${{ github.repository }}/releases/tag/v${VERSION})"$'\n'"${SUMMARY}"
