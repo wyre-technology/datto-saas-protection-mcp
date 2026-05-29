@@ -20,12 +20,12 @@ jobs:
     name: Release
     runs-on: ubuntu-latest
     needs: test
-    if: needs.release.outputs.released == 'true'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     permissions:
       contents: write
       issues: write
     outputs:
-      version: ${{ needs.release.outputs.version }}
+      version: ${{ steps.release-version.outputs.version }}
       released: ${{ steps.release-version.outputs.released }}
     steps:
       - uses: actions/checkout@v4
