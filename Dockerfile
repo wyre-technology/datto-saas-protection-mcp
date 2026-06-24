@@ -1,5 +1,5 @@
 # Multi-stage build for efficient container size
-FROM node:22-alpine AS builder
+FROM node:26-alpine AS builder
 
 ARG VERSION="unknown"
 ARG COMMIT_SHA="unknown"
@@ -20,7 +20,7 @@ RUN npm run build
 RUN --mount=type=secret,id=npmrc,target=/root/.npmrc npm prune --omit=dev
 
 # Production stage
-FROM node:22-alpine AS production
+FROM node:26-alpine AS production
 
 RUN addgroup -g 1001 -S datto && \
     adduser -S datto -u 1001 -G datto
