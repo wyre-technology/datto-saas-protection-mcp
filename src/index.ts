@@ -18,38 +18,15 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
-import { DattoSaasProtectionClient } from "@wyre-technology/node-datto-saas-protection";
+import type { DattoSaasProtectionClient } from "@wyre-technology/node-datto-saas-protection";
 import { setServerRef } from "./utils/server-ref.js";
 import { elicitConfirmation, elicitSelection, elicitText } from "./utils/elicitation.js";
-
-// ---------------------------------------------------------------------------
-// Credentials
-// ---------------------------------------------------------------------------
-
-interface DattoSaasCredentials {
-  publicKey: string;
-  secretKey: string;
-  region?: string;
-}
-
-function getCredentials(): DattoSaasCredentials | null {
-  const publicKey = process.env.DATTO_SAAS_PUBLIC_KEY;
-  const secretKey = process.env.DATTO_SAAS_SECRET_KEY;
-  if (!publicKey || !secretKey) return null;
-  return {
-    publicKey,
-    secretKey,
-    region: process.env.DATTO_SAAS_REGION || "us",
-  };
-}
-
-function createClient(creds: DattoSaasCredentials): DattoSaasProtectionClient {
-  return new DattoSaasProtectionClient({
-    publicKey: creds.publicKey,
-    secretKey: creds.secretKey,
-    region: (creds.region as "us" | "eu") || "us",
-  });
-}
+import {
+  cleanCredential,
+  createClient,
+  getCredentials,
+  type DattoSaasCredentials,
+} from "./credentials.js";
 
 // ---------------------------------------------------------------------------
 // Server factory — fresh server per request (stateless HTTP mode)
@@ -519,7 +496,8 @@ async function startHttpTransport(): Promise<void> {
         const headers = req.headers as Record<string, string | string[] | undefined>;
         const publicKey = headers["x-datto-saas-public-key"] as string | undefined;
         const secretKey = headers["x-datto-saas-secret-key"] as string | undefined;
-        const region = (headers["x-datto-saas-region"] as string | undefined) || "us";
+        // Strip an unresolved placeholder before the "us" fallback (issue #73).
+        const region = cleanCredential(headers["x-datto-saas-region"] as string | undefined) || "us";
 
         if (!publicKey || !secretKey) {
           res.writeHead(401, { "Content-Type": "application/json" });
