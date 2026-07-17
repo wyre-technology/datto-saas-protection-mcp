@@ -14,6 +14,8 @@ to AI assistants — list customer organizations, inspect protected domains and
 seats, browse backup history, queue restores, and audit activity logs and
 license usage.
 
+- **Interactive Seat Card (MCP Apps)**: `datto_saas_get_seat` renders as an interactive backup-status card in MCP Apps hosts (Claude Desktop/web) — read-only, showing seat type, Active/Archived status, and last backup; neutral by default, brandable via `window.__BRAND__` injection or `MCP_BRAND_*` env vars; plain-JSON behavior is unchanged in other hosts
+
 ## Tools
 
 | Tool | Purpose |
